@@ -9,6 +9,7 @@ import logging
 from typing import Dict, Any, Optional
 
 from client.ui.theme import COLORS
+# Update import to use the new module structure
 from client.ui.screens import LandingScreen, SetupScreen, GameScreen
 from client.ui.components import HorrorButton, TextInput
 
