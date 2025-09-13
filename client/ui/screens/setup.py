@@ -205,26 +205,29 @@ class SetupScreen(Screen):
     
     def _create_elements(self):
         """Create UI elements for the setup screen."""
+        # Center positions
+        center_x = self.width // 2
+        
         # Server connection
         self.elements["server_ip"] = TextInput(
-            250, 50, 300, 40, 
+            center_x - 150, 50, 300, 40, 
             placeholder="Server IP (e.g. 192.168.1.100)",
             text=self.ui.server_ip
         )
         
         self.elements["connect_button"] = HorrorButton(
-            560, 50, 140, 40, "Connect", 
+            center_x + 160, 50, 140, 40, "Connect", 
             action=lambda: self.ui.connect_to_server(self.elements["server_ip"].text)
         )
         
         # Player count selector
         self.elements["player_minus"] = HorrorButton(
-            250, 120, 40, 40, "-", 
+            center_x - 60, 120, 40, 40, "-", 
             action=lambda: self._change_player_count(-1)
         )
         
         self.elements["player_plus"] = HorrorButton(
-            370, 120, 40, 40, "+", 
+            center_x + 20, 120, 40, 40, "+", 
             action=lambda: self._change_player_count(1)
         )
         
@@ -233,9 +236,9 @@ class SetupScreen(Screen):
         for i in range(6):  # Support up to 6 players
             y_pos = 40 + i * 60  # Compact spacing
             
-            # Color selector
+            # Color selector - centered
             color_selector = ColorSelector(
-                100, y_pos, 
+                center_x - (len(self.available_colors) * (30 + 10)) // 2, y_pos, 
                 self.available_colors,
                 initial_color_index=min(i, len(self.available_colors)-1)
             )
@@ -246,7 +249,7 @@ class SetupScreen(Screen):
         
         # Start game button
         self.elements["start_game"] = HorrorButton(
-            300, 530, 200, 50, "Start Game",
+            center_x - 100, 530, 200, 50, "Start Game",
             font_size=24, action=self._start_game,
             disabled=not self.ui.client.is_connected
         )
@@ -342,10 +345,11 @@ class SetupScreen(Screen):
                 # Check each color selector with the adjusted position
                 for i in range(self.player_count):
                     # Calculate the correct position for this selector in the scrollable area
-                    selector_y = 40 + i * 60
+                    selector_center_x = self.scroll_area.rect.width // 2 - (len(self.available_colors) * (30 + 10)) // 2
+                    selector_y = 40 + i * 60 + 20  # +20 for offset from player label
                     
                     # Temporarily adjust the selector to the correct position
-                    self.color_selectors[i].set_position(100, selector_y)
+                    self.color_selectors[i].set_position(selector_center_x, selector_y)
                     
                     # Create a temporary event with the adjusted position
                     temp_event = pygame.event.Event(
@@ -381,16 +385,18 @@ class SetupScreen(Screen):
         # Fill with darker background
         pygame.draw.rect(surface, COLORS["shadow"], pygame.Rect(0, 0, self.width, self.height))
         
-        # Draw page title - moved down from 20 to 35 pixels from top
+        # Draw page title - centered
         title_font = pygame.font.SysFont("Arial", 32, bold=True)
         title_text = title_font.render("PREPARE THE VICTIMS", True, COLORS["fresh_blood"])
         title_rect = title_text.get_rect(center=(self.width//2, 35))
         surface.blit(title_text, title_rect)
         
-        # Draw server connection section
+        # Draw server connection section - centered
+        center_x = self.width // 2
         server_font = pygame.font.SysFont("Arial", 18)
         server_text = server_font.render("Server IP:", True, COLORS["bone"])
-        surface.blit(server_text, (100, 60))
+        server_text_rect = server_text.get_rect(right=center_x - 155, centery=70)
+        surface.blit(server_text, server_text_rect)
         
         # Draw server IP input
         if "server_ip" in self.elements:
@@ -400,10 +406,11 @@ class SetupScreen(Screen):
         if "connect_button" in self.elements:
             self.elements["connect_button"].draw(surface)
         
-        # Draw player count section
+        # Draw player count section - centered
         player_count_font = pygame.font.SysFont("Arial", 18)
         player_count_text = player_count_font.render("Number of Players:", True, COLORS["bone"])
-        surface.blit(player_count_text, (100, 130))
+        player_count_rect = player_count_text.get_rect(right=center_x - 65, centery=140)
+        surface.blit(player_count_text, player_count_rect)
         
         # Draw player count controls
         if "player_minus" in self.elements:
@@ -411,13 +418,16 @@ class SetupScreen(Screen):
         
         count_font = pygame.font.SysFont("Arial", 24, bold=True)
         count_text = count_font.render(str(self.player_count), True, COLORS["bone"])
-        count_rect = count_text.get_rect(center=(320, 140))
+        count_rect = count_text.get_rect(center=(center_x, 140))
         surface.blit(count_text, count_rect)
         
         if "player_plus" in self.elements:
             self.elements["player_plus"].draw(surface)
         
         # Create a subsurface for the scrollable area content
+        # Center the scroll area horizontally
+        scroll_area_width = self.width - 100
+        self.scroll_area.rect.x = (self.width - scroll_area_width) // 2
         scroll_rect = self.scroll_area.rect
         scroll_surface = surface.subsurface(scroll_rect)
         
@@ -434,12 +444,14 @@ class SetupScreen(Screen):
             if y_pos < -60 or y_pos > scroll_rect.height:
                 continue
             
-            # Player label
-            player_text = player_font.render(f"Player {i+1}:", True, COLORS["bone"])
-            scroll_surface.blit(player_text, (20, y_pos + 15))
+            # Player label - centered above color selector
+            player_text = player_font.render(f"Player {i+1}", True, COLORS["bone"])
+            player_rect = player_text.get_rect(center=(scroll_rect.width // 2, y_pos))
+            scroll_surface.blit(player_text, player_rect)
             
-            # Update the selector position for drawing
-            self.color_selectors[i].set_position(100, y_pos)
+            # Update the selector position for drawing - centered
+            selector_center_x = scroll_rect.width // 2 - (len(self.available_colors) * (30 + 10)) // 2
+            self.color_selectors[i].set_position(selector_center_x, y_pos + 20)
             
             # Draw color selector
             self.color_selectors[i].draw(scroll_surface)
@@ -451,9 +463,9 @@ class SetupScreen(Screen):
         if "start_game" in self.elements:
             self.elements["start_game"].draw(surface)
         
-        # Draw connection status
+        # Draw connection status - keep at bottom left (fixed error)
         conn_status = "Connected" if self.ui.client.is_connected else "Not Connected"
         conn_color = COLORS["toxic_green"] if self.ui.client.is_connected else COLORS["fresh_blood"]
         conn_font = pygame.font.SysFont("Arial", 16)
         conn_text = conn_font.render(f"Status: {conn_status}", True, conn_color)
-        surface.blit(conn_text, (10, self.height - 60))
+        surface.blit(conn_text, (10, self.height - 40))
