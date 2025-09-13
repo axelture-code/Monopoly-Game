@@ -5,6 +5,7 @@ Provides animations and special effects.
 import pygame
 import random
 import math
+import os
 from client.ui.theme import COLORS
 
 class BloodDrop:
@@ -284,8 +285,15 @@ class HauntedSkyline:
         self.fog_particles = []
         self.moon_x = screen_width * 0.8
         self.moon_y = screen_height * 0.2
+        self.moon_size = 60
+        self.moon_glow_size = 80
+        self.moon_alpha = 180
         self.stars = []
+        self.clouds = []
         self.time = 0
+        
+        # Load moon texture if available
+        self.moon_texture = self._load_moon_texture()
         
         # Generate buildings
         self._generate_buildings()
@@ -293,83 +301,99 @@ class HauntedSkyline:
         # Generate stars
         self._generate_stars()
         
+        # Generate clouds
+        self._generate_clouds(5)
+        
         # Generate initial fog
         self._generate_fog(20)
     
-    def _generate_buildings(self):
-        """Generate a skyline of buildings."""
-        self.buildings = []
-        
-        # Determine how many buildings to create
-        num_buildings = self.screen_width // 100 + 5
-        
-        # Create varied buildings across the screen
-        for i in range(num_buildings):
-            x = i * (self.screen_width / num_buildings)
-            # Vary the height
-            height = random.randint(100, 250)
-            width = random.randint(60, 120)
+    def _load_moon_texture(self):
+        """Load moon texture image or create a fallback texture."""
+        try:
+            # Try to load moon image from assets folder
+            moon_path = os.path.join('assets', 'images', 'moon.png')
+            if os.path.exists(moon_path):
+                return pygame.image.load(moon_path).convert_alpha()
             
-            # Decide if this should be a house or a building
-            if random.random() < 0.3:  # 30% chance for a house
-                self.buildings.append(HauntedHouse(
-                    x, self.screen_height, width, height
-                ))
-            else:
-                # For buildings, just add a rectangle
-                self.buildings.append({
-                    "x": x,
-                    "y": self.screen_height,
-                    "width": width,
-                    "height": height,
-                    "windows": []
-                })
-                
-                # Add windows to the building
-                window_size = 10
-                window_spacing = 20
-                num_floors = height // window_spacing
-                num_columns = width // window_spacing
-                
-                for floor in range(num_floors):
-                    for col in range(num_columns):
-                        # Not every window position should have a window
-                        if random.random() < 0.7:  # 70% chance
-                            window_x = x + col * window_spacing + (window_spacing - window_size) // 2
-                            window_y = self.screen_height - height + floor * window_spacing + (window_spacing - window_size) // 2
-                            
-                            # Randomize the glow of the window
-                            glow = random.randint(0, 180)
-                            glow_speed = random.uniform(0.1, 0.5)
-                            glow_direction = 1 if random.random() < 0.5 else -1
-                            
-                            self.buildings[-1]["windows"].append({
-                                "x": window_x,
-                                "y": window_y,
-                                "size": window_size,
-                                "glow": glow,
-                                "glow_speed": glow_speed,
-                                "glow_direction": glow_direction
-                            })
+            # If file doesn't exist, create a procedural moon texture
+            size = 128
+            texture = pygame.Surface((size, size), pygame.SRCALPHA)
+            
+            # Base moon circle
+            pygame.draw.circle(texture, (230, 230, 210), (size//2, size//2), size//2)
+            
+            # Add craters and details to make it look like a moon
+            for _ in range(15):
+                crater_x = random.randint(size//4, 3*size//4)
+                crater_y = random.randint(size//4, 3*size//4)
+                crater_size = random.randint(5, 15)
+                crater_color = (200, 200, 190, 150)
+                pygame.draw.circle(texture, crater_color, (crater_x, crater_y), crater_size)
+            
+            # Add some shadow gradients
+            shadow_surf = pygame.Surface((size, size), pygame.SRCALPHA)
+            for i in range(size//2):
+                alpha = 100 - (i * 2)
+                if alpha > 0:
+                    pygame.draw.circle(shadow_surf, (20, 20, 30, alpha), (size//4, size//2), size//2 - i)
+            
+            texture.blit(shadow_surf, (0, 0))
+            return texture
+        except Exception as e:
+            print(f"Error loading moon texture: {e}")
+            return None
+    
+    def _generate_clouds(self, count):
+        """Generate atmospheric clouds."""
+        for _ in range(count):
+            x = random.randint(-100, self.screen_width)
+            y = random.randint(50, self.screen_height // 3)
+            width = random.randint(100, 300)
+            height = random.randint(30, 80)
+            speed = random.uniform(0.1, 0.3)
+            alpha = random.randint(20, 60)
+            
+            self.clouds.append({
+                "x": x,
+                "y": y,
+                "width": width,
+                "height": height,
+                "speed": speed,
+                "alpha": alpha,
+                "bumps": random.randint(3, 6)
+            })
     
     def _generate_stars(self):
         """Generate stars in the night sky."""
         self.stars = []
         
-        # Create a bunch of stars
-        for _ in range(100):
+        # Create a bunch of stars with more variety
+        for _ in range(150):
             x = random.randint(0, self.screen_width)
             y = random.randint(0, self.screen_height // 2)  # Only in top half
-            size = random.uniform(0.5, 2)
+            size = random.uniform(0.5, 2.5)
             twinkle_speed = random.uniform(0.01, 0.05)
+            brightness = random.uniform(0.7, 1.0)
+            color_shift = random.randint(0, 30)
+            color = (
+                min(255, 255 - color_shift), 
+                min(255, 255 - color_shift // 2), 
+                min(255, 255 - color_shift // 3)
+            )
             
             self.stars.append({
                 "x": x,
                 "y": y,
                 "size": size,
                 "twinkle_speed": twinkle_speed,
-                "phase": random.uniform(0, 2 * math.pi)  # Random starting phase
+                "phase": random.uniform(0, 2 * math.pi),  # Random starting phase
+                "brightness": brightness,
+                "color": color
             })
+        
+        # Add a few shooting stars that appear occasionally
+        self.shooting_star_timer = 0
+        self.shooting_star = None
     
     def _generate_fog(self, count):
         """Generate fog particles."""
@@ -386,6 +410,72 @@ class HauntedSkyline:
                 "speed": speed,
                 "alpha": random.randint(20, 60)
             })
+    
+    def _generate_buildings(self):
+        """Generate a skyline of buildings."""
+        self.buildings = []
+        
+        # Start from the left edge of the screen
+        current_x = 0
+        
+        # Continue adding buildings until we fill the screen width
+        while current_x < self.screen_width:
+            # Vary the height
+            height = random.randint(100, 250)
+            width = random.randint(60, 120)
+            
+            # Ensure the building doesn't extend too far off screen
+            if current_x + width > self.screen_width + 50:
+                # Adjust width to fit within screen with some overlap allowed
+                width = max(60, self.screen_width + 50 - current_x)
+            
+            # Decide if this should be a house or a building
+            if random.random() < 0.3:  # 30% chance for a house
+                self.buildings.append(HauntedHouse(
+                    current_x, self.screen_height, width, height
+                ))
+            else:
+                # For buildings, just add a rectangle
+                building = {
+                    "x": current_x,
+                    "y": self.screen_height,
+                    "width": width,
+                    "height": height,
+                    "windows": []
+                }
+                
+                # Add windows to the building
+                window_size = 10
+                window_spacing = 20
+                num_floors = height // window_spacing
+                num_columns = width // window_spacing
+                
+                for floor in range(num_floors):
+                    for col in range(num_columns):
+                        # Not every window position should have a window
+                        if random.random() < 0.7:  # 70% chance
+                            window_x = current_x + col * window_spacing + (window_spacing - window_size) // 2
+                            window_y = self.screen_height - height + floor * window_spacing + (window_spacing - window_size) // 2
+                            
+                            # Randomize the glow of the window
+                            glow = random.randint(0, 180)
+                            glow_speed = random.uniform(0.1, 0.5)
+                            glow_direction = 1 if random.random() < 0.5 else -1
+                            
+                            building["windows"].append({
+                                "x": window_x,
+                                "y": window_y,
+                                "size": window_size,
+                                "glow": glow,
+                                "glow_speed": glow_speed,
+                                "glow_direction": glow_direction
+                            })
+                
+                self.buildings.append(building)
+            
+            # Move to the position for the next building with a small gap
+            gap = random.randint(5, 15)  # Small random gap between buildings
+            current_x += width + gap
     
     def update(self):
         """Update the skyline animation."""
@@ -406,6 +496,13 @@ class HauntedSkyline:
                         window["glow"] = 20
                         window["glow_direction"] = 1
         
+        # Update clouds
+        for cloud in self.clouds:
+            cloud["x"] += cloud["speed"]
+            if cloud["x"] > self.screen_width + 100:
+                cloud["x"] = -cloud["width"]
+                cloud["y"] = random.randint(50, self.screen_height // 3)
+        
         # Update fog particles
         for particle in self.fog_particles[:]:
             particle["x"] -= particle["speed"]
@@ -417,6 +514,25 @@ class HauntedSkyline:
         # Add new fog particles occasionally
         if random.random() < 0.02:  # 2% chance per frame
             self._generate_fog(1)
+        
+        # Occasionally add a shooting star
+        self.shooting_star_timer -= 1
+        if self.shooting_star_timer <= 0 and random.random() < 0.02:
+            self.shooting_star = {
+                "x": random.randint(0, self.screen_width),
+                "y": random.randint(0, self.screen_height // 3),
+                "angle": random.uniform(math.pi/4, math.pi/2),
+                "speed": random.uniform(5, 15),
+                "length": random.randint(30, 80),
+                "life": random.randint(20, 40)
+            }
+            self.shooting_star_timer = random.randint(100, 300)
+            
+        # Update existing shooting star
+        if self.shooting_star:
+            self.shooting_star["life"] -= 1
+            if self.shooting_star["life"] <= 0:
+                self.shooting_star = None
     
     def draw(self, surface):
         """Draw the haunted skyline."""
@@ -424,22 +540,116 @@ class HauntedSkyline:
         sky_rect = pygame.Rect(0, 0, self.screen_width, self.screen_height)
         pygame.draw.rect(surface, COLORS["midnight"], sky_rect)
         
+        # Add a subtle gradient from dark blue at top to darker at bottom
+        gradient_surf = pygame.Surface((self.screen_width, self.screen_height // 2), pygame.SRCALPHA)
+        for y in range(self.screen_height // 2):
+            alpha = 50 - int(y / (self.screen_height // 2) * 50)
+            pygame.draw.line(gradient_surf, (0, 20, 50, alpha), (0, y), (self.screen_width, y))
+        surface.blit(gradient_surf, (0, 0))
+        
         # Draw stars
         for star in self.stars:
             # Calculate twinkle effect
-            twinkle = 0.5 + 0.5 * math.sin(self.time * star["twinkle_speed"] + star["phase"])
+            twinkle = star["brightness"] * (0.5 + 0.5 * math.sin(self.time * star["twinkle_speed"] + star["phase"]))
             size = star["size"] * twinkle
+            
+            # Calculate color with twinkle
+            color = tuple(min(255, int(c * twinkle)) for c in star["color"])
             
             # Draw the star as a small circle
             pygame.draw.circle(
                 surface, 
-                COLORS["white"], 
+                color, 
                 (int(star["x"]), int(star["y"])), 
                 size
             )
+            
+            # Add a subtle glow for brighter stars
+            if star["size"] > 1.5:
+                glow_size = size * 2
+                glow_surf = pygame.Surface((int(glow_size*2), int(glow_size*2)), pygame.SRCALPHA)
+                glow_color = (*color[:3], 50)  # Semi-transparent
+                pygame.draw.circle(glow_surf, glow_color, (int(glow_size), int(glow_size)), int(glow_size))
+                surface.blit(glow_surf, (int(star["x"] - glow_size), int(star["y"] - glow_size)))
         
-        # Draw the moon
-        pygame.draw.circle(surface, COLORS["bone"], (int(self.moon_x), int(self.moon_y)), 30)
+        # Draw shooting star if active
+        if self.shooting_star:
+            ss = self.shooting_star
+            # Calculate end point based on angle and length
+            end_x = ss["x"] - math.cos(ss["angle"]) * ss["length"]
+            end_y = ss["y"] + math.sin(ss["angle"]) * ss["length"]
+            
+            # Move the shooting star
+            ss["x"] += math.cos(ss["angle"]) * ss["speed"]
+            ss["y"] -= math.sin(ss["angle"]) * ss["speed"]
+            
+            # Draw the shooting star trail
+            fade_factor = min(1.0, ss["life"] / 20.0)
+            for i in range(10):
+                segment_start_x = ss["x"] - (i/10) * math.cos(ss["angle"]) * ss["length"]
+                segment_start_y = ss["y"] + (i/10) * math.sin(ss["angle"]) * ss["length"]
+                segment_end_x = ss["x"] - ((i+1)/10) * math.cos(ss["angle"]) * ss["length"]
+                segment_end_y = ss["y"] + ((i+1)/10) * math.sin(ss["angle"]) * ss["length"]
+                
+                alpha = int(255 * (1 - i/10) * fade_factor)
+                color = (255, 255, 255, alpha)
+                
+                pygame.draw.line(
+                    surface, 
+                    color, 
+                    (segment_start_x, segment_start_y), 
+                    (segment_end_x, segment_end_y), 
+                    2
+                )
+        
+        # Draw clouds behind the moon
+        for cloud in self.clouds:
+            cloud_surf = pygame.Surface((cloud["width"], cloud["height"]), pygame.SRCALPHA)
+            
+            # Draw cloud as a series of overlapping circles
+            base_y = cloud["height"] // 2
+            bump_width = cloud["width"] // cloud["bumps"]
+            
+            for i in range(cloud["bumps"]):
+                bump_x = i * bump_width + bump_width // 2
+                bump_radius = random.randint(cloud["height"] // 2, cloud["height"] - 10)
+                cloud_color = (30, 30, 40, cloud["alpha"])
+                pygame.draw.circle(cloud_surf, cloud_color, (bump_x, base_y), bump_radius)
+            
+            surface.blit(cloud_surf, (cloud["x"], cloud["y"]))
+        
+        # Draw the moon with texture or procedural effect
+        if self.moon_texture:
+            # Draw moon glow
+            glow_surf = pygame.Surface((self.moon_glow_size*2, self.moon_glow_size*2), pygame.SRCALPHA)
+            for radius in range(self.moon_glow_size, self.moon_size, -1):
+                alpha = int(50 * (radius - self.moon_size) / (self.moon_glow_size - self.moon_size))
+                pygame.draw.circle(glow_surf, (255, 255, 220, alpha), 
+                                  (self.moon_glow_size, self.moon_glow_size), radius)
+            
+            surface.blit(glow_surf, (int(self.moon_x - self.moon_glow_size), 
+                                     int(self.moon_y - self.moon_glow_size)))
+            
+            # Draw the textured moon
+            scaled_moon = pygame.transform.scale(self.moon_texture, 
+                                                (self.moon_size*2, self.moon_size*2))
+            surface.blit(scaled_moon, (int(self.moon_x - self.moon_size), 
+                                      int(self.moon_y - self.moon_size)))
+        else:
+            # Fallback to a circle if texture loading failed
+            # Draw moon glow
+            glow_surf = pygame.Surface((self.moon_glow_size*2, self.moon_glow_size*2), pygame.SRCALPHA)
+            for radius in range(self.moon_glow_size, self.moon_size, -1):
+                alpha = int(30 * (radius - self.moon_size) / (self.moon_glow_size - self.moon_size))
+                pygame.draw.circle(glow_surf, (255, 255, 220, alpha), 
+                                  (self.moon_glow_size, self.moon_glow_size), radius)
+            
+            surface.blit(glow_surf, (int(self.moon_x - self.moon_glow_size), 
+                                     int(self.moon_y - self.moon_glow_size)))
+            
+            # Draw the moon circle
+            pygame.draw.circle(surface, COLORS["bone"], 
+                              (int(self.moon_x), int(self.moon_y)), self.moon_size)
         
         # Draw buildings
         for building in self.buildings:
@@ -460,6 +670,23 @@ class HauntedSkyline:
                     pygame.draw.rect(window_surface, window_color, (0, 0, window["size"], window["size"]))
                     surface.blit(window_surface, (window["x"], window["y"]))
         
+        # Draw clouds that might be in front of buildings
+        for cloud in self.clouds:
+            if cloud["y"] > self.screen_height // 4:
+                cloud_surf = pygame.Surface((cloud["width"], cloud["height"]), pygame.SRCALPHA)
+                
+                # Draw cloud as a series of overlapping circles
+                base_y = cloud["height"] // 2
+                bump_width = cloud["width"] // cloud["bumps"]
+                
+                for i in range(cloud["bumps"]):
+                    bump_x = i * bump_width + bump_width // 2
+                    bump_radius = random.randint(cloud["height"] // 2, cloud["height"] - 10)
+                    cloud_color = (30, 30, 40, cloud["alpha"])
+                    pygame.draw.circle(cloud_surf, cloud_color, (bump_x, base_y), bump_radius)
+                
+                surface.blit(cloud_surf, (cloud["x"], cloud["y"]))
+        
         # Draw fog particles
         for particle in self.fog_particles:
             fog_surface = pygame.Surface((particle["size"], particle["size"]), pygame.SRCALPHA)
@@ -468,116 +695,5 @@ class HauntedSkyline:
             surface.blit(fog_surface, (particle["x"], particle["y"]))
 
 
-class SlowCobweb:
-    """A slow-moving cobweb effect for corners."""
-    
-    def __init__(self, x, y, size, corner):
-        """
-        Initialize a cobweb.
-        corner: 'tl' (top-left), 'tr' (top-right), 'bl' (bottom-left), 'br' (bottom-right)
-        """
-        self.x = x
-        self.y = y
-        self.size = size
-        self.corner = corner
-        self.strands = []
-        self.time = 0
-        self.generate_strands()
-        
-    def generate_strands(self):
-        """Generate the cobweb strands."""
-        num_strands = random.randint(5, 8)
-        
-        for i in range(num_strands):
-            # Calculate strand endpoints based on corner
-            if self.corner == 'tl':  # Top left
-                end_x = self.x + self.size * random.uniform(0.7, 1.0)
-                end_y = self.y + self.size * random.uniform(0.7, 1.0)
-            elif self.corner == 'tr':  # Top right
-                end_x = self.x - self.size * random.uniform(0.7, 1.0)
-                end_y = self.y + self.size * random.uniform(0.7, 1.0)
-            elif self.corner == 'bl':  # Bottom left
-                end_x = self.x + self.size * random.uniform(0.7, 1.0)
-                end_y = self.y - self.size * random.uniform(0.7, 1.0)
-            else:  # Bottom right
-                end_x = self.x - self.size * random.uniform(0.7, 1.0)
-                end_y = self.y - self.size * random.uniform(0.7, 1.0)
-                
-            # Add connecting strands (spider web rings)
-            num_connects = random.randint(2, 4)
-            connects = []
-            
-            for j in range(num_connects):
-                # How far along the strand
-                pct = random.uniform(0.2, 0.8)
-                
-                # Connection point
-                cx = self.x + (end_x - self.x) * pct
-                cy = self.y + (end_y - self.y) * pct
-                
-                # Connection length - shorter near edges
-                length = self.size * 0.3 * (1 - pct)
-                
-                # Connection angle - perpendicular to strand with some randomness
-                angle = math.atan2(end_y - self.y, end_x - self.x) + math.pi/2
-                angle += random.uniform(-0.3, 0.3)
-                
-                connects.append({
-                    "x": cx,
-                    "y": cy,
-                    "length": length,
-                    "angle": angle
-                })
-            
-            self.strands.append({
-                "end_x": end_x,
-                "end_y": end_y,
-                "connects": connects,
-                "thickness": random.uniform(1, 2)
-            })
-    
-    def update(self):
-        """Update the cobweb animation."""
-        # Very subtle movement
-        self.time += 0.002
-        
-    def draw(self, surface):
-        """Draw the cobweb on the surface."""
-        # Draw each strand
-        for strand in self.strands:
-            # Apply a gentle wave to the strand
-            wave_x = math.sin(self.time + strand["end_x"] * 0.01) * 2
-            wave_y = math.cos(self.time + strand["end_y"] * 0.01) * 2
-            
-            end_x = strand["end_x"] + wave_x
-            end_y = strand["end_y"] + wave_y
-            
-            # Draw the main strand
-            pygame.draw.line(
-                surface, 
-                COLORS["bone"], 
-                (self.x, self.y), 
-                (end_x, end_y), 
-                int(strand["thickness"])
-            )
-            
-            # Draw connecting strands
-            for connect in strand["connects"]:
-                # Apply wave to connection point
-                cx = connect["x"] + wave_x * 0.5
-                cy = connect["y"] + wave_y * 0.5
-                
-                # Calculate end point of connecting strand
-                con_end_x = cx + math.cos(connect["angle"]) * connect["length"]
-                con_end_y = cy + math.sin(connect["angle"]) * connect["length"]
-                
-                pygame.draw.line(
-                    surface,
-                    COLORS["bone"],
-                    (cx, cy),
-                    (con_end_x, con_end_y),
-                    1
-                )
-
-
-__all__ = ['BloodDrop', 'BloodTitle', 'HauntedSkyline', 'SlowCobweb']
+__all__ = ['BloodDrop', 'BloodTitle', 'HauntedSkyline']
+  
