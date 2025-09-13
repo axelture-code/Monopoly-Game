@@ -168,19 +168,16 @@ class MonopolyUI:
         else:
             self.status_message = "Failed to connect to server"
     
-    def start_game(self, player_names):
+    def start_game(self, player_names, player_colors=None):
         """Initialize the game with the specified players."""
         if not self.client.is_connected:
             self.status_message = "Not connected to server. Please connect first."
             return False
         
-        # Check for duplicate names
-        unique_names = set(name for name in player_names if name)
-        if len(unique_names) != len([name for name in player_names if name]):
-            self.status_message = "All players must have unique names"
-            return False
+        # Store player colors
+        self.player_colors = player_colors if player_colors else []
         
-        # Register players with the server
+        # Register players with the server (using color names as player names)
         for name in player_names:
             if name:
                 self.client.register_player(name)
@@ -223,3 +220,4 @@ class MonopolyUI:
 
 # Export the main UI class
 __all__ = ['MonopolyUI']
+
